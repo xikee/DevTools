@@ -27,7 +27,7 @@ mkdir -p "$OUTPUT"
 OUTPUT="$(cd "$OUTPUT" && pwd)"
 DEST="$OUTPUT/DevTools.app"
 if [ -e "$DEST" ]; then
-  echo "目标已存在: $DEST。请用 --output 指定新的输出目录，避免覆盖已有应用。" >&2
+  echo "目标已存在: ${DEST}。请用 --output 指定新的输出目录，避免覆盖已有应用。" >&2
   exit 1
 fi
 WORK="$(mktemp -d "${TMPDIR:-/tmp}/devtools-build.XXXXXX")"
@@ -37,7 +37,7 @@ compile() {
   xcrun swiftc -O -target "$1-apple-macos14.0" "main.swift" "MainMenu.swift" \
     -framework AppKit -framework WebKit -o "$2"
 }
-echo "==> 构建 DevTools $VERSION ($ARCH，最低 macOS 14.0)"
+echo "==> 构建 DevTools $VERSION (${ARCH}，最低 macOS 14.0)"
 if [ "$ARCH" = "universal" ]; then
   compile arm64 "$WORK/DevTools-arm64"
   compile x86_64 "$WORK/DevTools-x86_64"
