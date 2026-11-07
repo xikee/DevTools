@@ -39,7 +39,7 @@ jobs:
       - name: Build, test and package Universal app
         run: |
           bash "scripts/package-release.sh" universal "dist/release"
-          xcrun lipo -verify_arch arm64 x86_64 "dist/release/build-universal/DevTools.app/Contents/MacOS/DevTools"
+          xcrun lipo "dist/release/build-universal/DevTools.app/Contents/MacOS/DevTools" -verify_arch arm64 x86_64
       - name: Prepare release notes
         run: |
           VERSION="$(tr -d '[:space:]' < "VERSION")"
