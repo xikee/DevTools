@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Test (${{ matrix.runner }})
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [macos-15, macos-15-intel]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - name: Check JavaScript and shell syntax
+        run: |
+          node --check "app.js"
+          node --check "tests/regression.test.cjs"
+          bash -n "build.sh" "scripts/package-release.sh" "icon/make-icon.sh"
+      - name: Run regression tests in both time zones
+        run: |
+          TZ=Asia/Shanghai node --test "tests/regression.test.cjs"
+          TZ=America/New_York node --test "tests/regression.test.cjs"
+      - name: Check Swift types
+        run: xcrun swiftc -typecheck "main.swift" "MainMenu.swift" -framework AppKit -framework WebKit
+      - name: Build native application
+        run: bash "build.sh" --output "dist/ci"
+      - name: Test packaged resources in WKWebView
+        run: xcrun swift "tests/webkit-smoke.swift" "$PWD/dist/ci/DevTools.app/Contents/Resources/index.html"
+      - name: Verify application signature
+        run: codesign --verify --deep --strict "dist/ci/DevTools.app"

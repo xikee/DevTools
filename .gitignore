@@ -1,0 +1,27 @@
+# macOS 与编辑器缓存
+.DS_Store
+._*
+.idea/
+.vscode/
+.workbuddy/
+.codex/
+*.swp
+
+# 本地应用、构建和下载产物使用 Releases 分发
+*.app/
+dist/
+.build/
+*.dSYM/
+*.zip
+*.dmg
+*.log
+
+# 本机凭据和环境配置
+.env
+.env.*
+!.env.example
+*.p12
+*.mobileprovision
+
+# 历史素材处理实验，不属于应用或图标构建流程
+/icon/dewatermark.swift

@@ -1,0 +1,72 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*.*.*']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Build and publish Universal app
+    runs-on: macos-15
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - name: Validate tag against VERSION
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          VERSION="$(tr -d '[:space:]' < "VERSION")"
+          test "$TAG" = "v$VERSION" || { echo "Tag and VERSION do not match" >&2; exit 1; }
+      - name: Run regression tests
+        run: |
+          TZ=Asia/Shanghai node --test "tests/regression.test.cjs"
+          TZ=America/New_York node --test "tests/regression.test.cjs"
+      - name: Build, test and package Universal app
+        run: |
+          bash "scripts/package-release.sh" universal "dist/release"
+          xcrun lipo -verify_arch arm64 x86_64 "dist/release/build-universal/DevTools.app/Contents/MacOS/DevTools"
+      - name: Prepare release notes
+        run: |
+          VERSION="$(tr -d '[:space:]' < "VERSION")"
+          awk -v version="$VERSION" '/^## \[/{if (found) exit; if (index($0, "[" version "]")) found=1; next} found{print}' "CHANGELOG.md" > "$RUNNER_TEMP/release-notes.md"
+          cat >> "$RUNNER_TEMP/release-notes.md" <<'EOF'
+
+          ## 下载与安装
+
+          - 适用于 macOS 14+，Universal ZIP 同时包含 Apple Silicon 和 Intel 程序。
+          - 解压 ZIP，将 `DevTools.app` 拖入“应用程序”。
+          - 下载同一版本的 `SHA256SUMS.txt` 后，可运行 `shasum -a 256 -c SHA256SUMS.txt` 校验。
+          - 当前为 ad-hoc 签名，尚未进行 Apple Developer ID 签名及公证；首次打开方式见 README。
+          EOF
+      - name: Upload assets to draft, then publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          VERSION="$(tr -d '[:space:]' < "VERSION")"
+          STATE="$(gh release view "$TAG" --json isDraft --jq '.isDraft' 2>/dev/null || printf 'missing')"
+          if [ "$STATE" = "false" ]; then
+            echo "Release is already published; refusing to overwrite assets" >&2
+            exit 1
+          fi
+          if [ "$STATE" = "missing" ]; then
+            gh release create "$TAG" --verify-tag --draft --title "DevTools $VERSION" --notes-file "$RUNNER_TEMP/release-notes.md"
+          fi
+          gh release upload "$TAG" "dist/release/DevTools-v$VERSION-macos-universal.zip" "dist/release/SHA256SUMS.txt" --clobber
+          gh release edit "$TAG" --draft=false --latest

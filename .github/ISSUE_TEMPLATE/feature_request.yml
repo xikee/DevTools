@@ -1,0 +1,18 @@
+name: 功能建议
+description: 描述一个具体的改进场景
+title: "[Feature] "
+body:
+  - type: textarea
+    id: use_case
+    attributes:
+      label: 使用场景
+      description: 你目前遇到了什么问题？
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: 建议的行为
+      description: 请说明期望的输入、输出或操作流程。
+    validations:
+      required: true

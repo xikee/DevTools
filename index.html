@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DevTools 开发工具箱</title>
+<style>
+  :root {
+    --bg: #f5f5f7;
+    --sidebar: #ececf0;
+    --card: #ffffff;
+    --text: #1d1d1f;
+    --muted: #6e6e73;
+    --border: #d2d2d7;
+    --accent: #0071e3;
+    --accent-soft: #e8f1fe;
+    --code-bg: #f0f0f3;
+    --green: #34c759;
+    --red: #ff3b30;
+    --shadow: 0 1px 3px rgba(0,0,0,.08), 0 6px 20px rgba(0,0,0,.05);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1e1e1e;
+      --sidebar: #2a2a2c;
+      --card: #2c2c2e;
+      --text: #f5f5f7;
+      --muted: #9a9aa0;
+      --border: #3a3a3c;
+      --accent: #2997ff;
+      --accent-soft: #1c3450;
+      --code-bg: #1a1a1c;
+      --shadow: 0 1px 3px rgba(0,0,0,.4), 0 6px 20px rgba(0,0,0,.3);
+    }
+  }
+  * { box-sizing: border-box; -webkit-font-smoothing: antialiased; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+    background: var(--bg); color: var(--text); font-size: 13px;
+  }
+  .app { display: flex; height: 100vh; overflow: hidden; }
+  .sidebar {
+    width: 232px; flex: 0 0 232px; background: var(--sidebar);
+    border-right: 1px solid var(--border); display: flex; flex-direction: column;
+    padding: 14px 10px; gap: 6px;
+  }
+  .brand { display: flex; align-items: center; gap: 10px; padding: 4px 8px 14px; }
+  .logo {
+    width: 34px; height: 34px; border-radius: 9px; background: linear-gradient(135deg,#0071e3,#42a5ff);
+    display: flex; align-items: center; justify-content: center; font-size: 18px; color: #fff;
+  }
+  .brand-title { font-weight: 700; font-size: 15px; }
+  .brand-sub { font-size: 11px; color: var(--muted); }
+  .nav { display: flex; flex-direction: column; gap: 2px; overflow-y: auto; flex: 1; }
+  .nav-item {
+    text-align: left; border: none; background: transparent; color: var(--text);
+    padding: 8px 10px; border-radius: 8px; cursor: pointer; font-size: 13px;
+    display: flex; align-items: center; gap: 9px; transition: background .12s;
+  }
+  .nav-item:hover { background: rgba(127,127,127,.15); }
+  .nav-item.active { background: var(--accent); color: #fff; font-weight: 600; }
+  .nav-item .ico { width: 18px; text-align: center; }
+  .sidebar-foot { font-size: 10px; color: var(--muted); padding: 8px; text-align: center; }
+  .content { flex: 1; overflow-y: auto; padding: 26px 30px 60px; }
+  .panel { display: none; max-width: 980px; margin: 0 auto; }
+  .panel.active { display: block; animation: fade .18s ease; }
+  @keyframes fade { from { opacity: 0; transform: translateY(4px);} to {opacity:1; transform:none;} }
+  .panel-head { margin-bottom: 18px; }
+  .panel-head h1 { font-size: 22px; margin: 0 0 4px; font-weight: 700; }
+  .panel-head p { margin: 0; color: var(--muted); font-size: 12.5px; }
+  .card {
+    background: var(--card); border: 1px solid var(--border); border-radius: 14px;
+    padding: 16px; margin-bottom: 16px; box-shadow: var(--shadow);
+  }
+  .card h3 { margin: 0 0 12px; font-size: 13px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+  .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+  .row + .row { margin-top: 10px; }
+  label { font-size: 12px; color: var(--muted); display: block; margin-bottom: 5px; }
+  textarea, input, select {
+    font-family: "SF Mono", ui-monospace, Menlo, Consolas, monospace; font-size: 12.5px;
+    background: var(--code-bg); color: var(--text); border: 1px solid var(--border);
+    border-radius: 9px; padding: 9px 11px; outline: none; width: 100%;
+  }
+  textarea { resize: vertical; min-height: 120px; line-height: 1.5; }
+  input:focus, textarea:focus, select:focus { border-color: var(--accent); }
+  input[type=number] { width: 90px; }
+  input[type=color] { width: 46px; height: 38px; padding: 3px; cursor: pointer; }
+  .btn {
+    border: none; background: var(--accent); color: #fff; padding: 8px 14px;
+    border-radius: 9px; cursor: pointer; font-size: 12.5px; font-weight: 600; transition: filter .12s;
+  }
+  .btn:hover { filter: brightness(1.06); }
+  .btn:active { filter: brightness(.94); }
+  .btn:disabled { opacity: .5; cursor: default; filter: none; }
+  .btn.ghost { background: var(--accent-soft); color: var(--accent); }
+  .btn.sm { padding: 6px 11px; font-size: 12px; }
+  .out {
+    margin-top: 10px; background: var(--code-bg); border: 1px solid var(--border);
+    border-radius: 9px; padding: 11px; font-family: "SF Mono", ui-monospace, Menlo, monospace;
+    font-size: 12.5px; white-space: pre-wrap; word-break: break-all; min-height: 22px;
+  }
+  .err { color: var(--red); font-size: 12px; margin-top: 8px; white-space: pre-wrap; }
+  .ok { color: var(--green); }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  @media (max-width: 760px){ .grid2 { grid-template-columns: 1fr; } }
+  .kv { display: flex; justify-content: space-between; padding: 7px 0; border-bottom: 1px dashed var(--border); }
+  .kv:last-child { border-bottom: none; }
+  .kv .k { color: var(--muted); }
+  .kv .v { font-family: "SF Mono", ui-monospace, monospace; font-weight: 600; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 8px; }
+  th, td { text-align: left; padding: 7px 9px; border-bottom: 1px solid var(--border); }
+  th { color: var(--muted); font-weight: 600; }
+  td.mono { font-family: "SF Mono", ui-monospace, monospace; word-break: break-all; }
+  .pill { display: inline-block; padding: 2px 8px; border-radius: 20px; background: var(--accent-soft); color: var(--accent); font-size: 11px; font-weight: 600; margin-left: 6px; }
+  pre.json { margin: 0; font-family: "SF Mono", ui-monospace, monospace; font-size: 12.5px; line-height: 1.55; white-space: pre-wrap; word-break: break-word; }
+  .json .key { color: #c586c0; }
+  .json .str { color: #2e9b57; }
+  .json .num { color: #b9881f; }
+  .json .bool { color: #2997ff; }
+  .json .null { color: #ff3b30; }
+  @media (prefers-color-scheme: dark){ .json .key{color:#d98ae0;} .json .str{color:#4ec97a;} .json .num{color:#e0b340;} }
+  .hint { font-size: 11.5px; color: var(--muted); margin-top: 6px; }
+  .swatch { width: 100%; height: 56px; border-radius: 10px; border: 1px solid var(--border); margin-top: 10px; }
+  .stat { display: flex; gap: 18px; flex-wrap: wrap; }
+  .stat .item { background: var(--code-bg); border-radius: 10px; padding: 10px 14px; }
+  .stat .num { font-size: 20px; font-weight: 700; }
+  .stat .lbl { font-size: 11px; color: var(--muted); }
+  #toast {
+    position: fixed; left: 50%; bottom: 34px; transform: translate(-50%, 12px);
+    background: rgba(30,30,32,.92); color: #fff; padding: 9px 18px; border-radius: 20px;
+    font-size: 12.5px; font-weight: 600; opacity: 0; pointer-events: none;
+    transition: opacity .18s, transform .18s; z-index: 999; backdrop-filter: blur(8px);
+  }
+  #toast.show { opacity: 1; transform: translate(-50%, 0); }
+  @media (prefers-color-scheme: light){ #toast { background: rgba(30,30,32,.9); } }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="logo">⚡</div>
+      <div><div class="brand-title">DevTools</div><div class="brand-sub">开发工具箱</div></div>
+    </div>
+    <nav class="nav" id="nav">
+      <button class="nav-item active" data-tool="timestamp"><span class="ico">🕐</span>时间戳转换</button>
+      <button class="nav-item" data-tool="json"><span class="ico">{}</span>JSON 格式化</button>
+      <button class="nav-item" data-tool="url"><span class="ico">🔗</span>URL 编解码</button>
+      <button class="nav-item" data-tool="base64"><span class="ico">🔒</span>Base64</button>
+      <button class="nav-item" data-tool="uuid"><span class="ico">🆔</span>UUID 生成</button>
+      <button class="nav-item" data-tool="regex"><span class="ico">🔍</span>正则测试</button>
+      <button class="nav-item" data-tool="color"><span class="ico">🎨</span>颜色转换</button>
+      <button class="nav-item" data-tool="base"><span class="ico">🔢</span>进制转换</button>
+      <button class="nav-item" data-tool="hash"><span class="ico">#</span>哈希计算</button>
+      <button class="nav-item" data-tool="text"><span class="ico">📝</span>文本处理</button>
+    </nav>
+    <div class="sidebar-foot">macOS 14 · 原生 App<br>离线可用 · 数据不出本机</div>
+  </aside>
+
+  <main class="content">
+    <!-- ===== 时间戳 ===== -->
+    <section class="panel active" data-tool="timestamp">
+      <div class="panel-head"><h1>时间戳转换</h1><p>Unix 时间戳与日期互转，支持自动识别及手动选择秒/毫秒</p></div>
+      <div class="card">
+        <h3>当前时间</h3>
+        <div class="kv"><span class="k">秒级时间戳</span><span class="v" id="tsNowSec">-</span></div>
+        <div class="kv"><span class="k">毫秒级时间戳</span><span class="v" id="tsNowMs">-</span></div>
+        <div class="kv"><span class="k">本地时间</span><span class="v" id="tsNowLocal">-</span></div>
+        <div class="kv"><span class="k">UTC 时间</span><span class="v" id="tsNowUtc">-</span></div>
+      </div>
+      <div class="card">
+        <h3>时间戳 → 日期</h3>
+        <div class="row">
+          <input id="tsInput" placeholder="输入时间戳，如 1694937600 或 1694937600000" style="flex:1">
+          <select id="tsUnit" aria-label="时间戳单位" style="width:120px">
+            <option value="auto">自动识别单位</option>
+            <option value="sec">秒</option>
+            <option value="ms">毫秒</option>
+          </select>
+          <select id="tsTz" style="width:120px">
+            <option value="local">本地时区</option>
+            <option value="utc">UTC</option>
+          </select>
+        </div>
+        <div class="out" id="tsToDateOut">—</div>
+        <div class="hint">自动识别按数值大小推测单位；早期日期或特殊范围请手动选择秒／毫秒。</div>
+      </div>
+      <div class="card">
+        <h3>日期 → 时间戳</h3>
+        <div class="row">
+          <input id="tsDateInput" placeholder="如 2026-09-17 17:41:00 或 ISO 字符串" style="flex:1">
+        </div>
+        <div class="row">
+          <button class="btn sm ghost" id="tsNowFill">填入当前时间</button>
+        </div>
+        <div class="out" id="tsToTsOut">—</div>
+        <div class="hint" id="tsDateNote"></div>
+      </div>
+    </section>
+
+    <!-- ===== JSON ===== -->
+    <section class="panel" data-tool="json">
+      <div class="panel-head"><h1>JSON 格式化</h1><p>格式化、压缩、校验、语法高亮、转义</p></div>
+      <div class="card">
+        <div class="row" style="align-items:flex-end">
+          <div style="flex:1">
+            <label>输入</label>
+            <textarea id="jsonInput" placeholder='{"name":"DevTools","ok":true,"list":[1,2,3]}'></textarea>
+          </div>
+        </div>
+        <div class="row" style="margin-top:10px">
+          <label style="margin:0">缩进</label>
+          <select id="jsonIndent" style="width:90px"><option>2</option><option>4</option><option>0</option></select>
+          <button class="btn sm" id="btnJsonFormat">格式化</button>
+          <button class="btn sm ghost" id="btnJsonMin">压缩</button>
+          <button class="btn sm ghost" id="btnJsonEscape">转义</button>
+          <button class="btn sm ghost" id="btnJsonUnescape">反转义</button>
+          <button class="btn sm ghost" id="btnJsonCopy">复制结果</button>
+        </div>
+        <div class="err" id="jsonErr"></div>
+        <div class="card" style="margin-top:12px; box-shadow:none; background:var(--code-bg)">
+          <pre class="json" id="jsonOut"></pre>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== URL ===== -->
+    <section class="panel" data-tool="url">
+      <div class="panel-head"><h1>URL 编解码</h1><p>组件级 / 整体编解码，Query 参数解析</p></div>
+      <div class="card">
+        <label>输入</label>
+        <textarea id="urlInput" placeholder="https://example.com/搜索?q=hello world&page=1"></textarea>
+        <div class="row" style="margin-top:10px">
+          <button class="btn sm" id="btnUrlEncC">编码(component)</button>
+          <button class="btn sm ghost" id="btnUrlDecC">解码(component)</button>
+          <button class="btn sm ghost" id="btnUrlEnc">编码(整体)</button>
+          <button class="btn sm ghost" id="btnUrlDec">解码(整体)</button>
+          <button class="btn sm ghost" id="btnUrlParse">解析参数</button>
+        </div>
+        <div class="out" id="urlOut">—</div>
+        <div id="urlParamsWrap" style="margin-top:12px; display:none">
+          <h3 style="font-size:12px;color:var(--muted);margin:0 0 4px">Query 参数</h3>
+          <table id="urlParams"><thead><tr><th>Key</th><th>Value</th></tr></thead><tbody></tbody></table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== Base64 ===== -->
+    <section class="panel" data-tool="base64">
+      <div class="panel-head"><h1>Base64 编解码</h1><p>支持 UTF-8 中文（标准 / URL-safe）</p></div>
+      <div class="card">
+        <label>输入</label>
+        <textarea id="b64Input" placeholder="输入文本或 Base64 字符串"></textarea>
+        <div class="row" style="margin-top:10px">
+          <button class="btn sm" id="btnB64Enc">编码</button>
+          <button class="btn sm ghost" id="btnB64Dec">解码</button>
+          <button class="btn sm ghost" id="btnB64Url">URL-safe 编码</button>
+          <button class="btn sm ghost" id="btnB64Copy">复制</button>
+        </div>
+        <div class="err" id="b64Err"></div>
+        <div class="out" id="b64Out">—</div>
+      </div>
+    </section>
+
+    <!-- ===== UUID ===== -->
+    <section class="panel" data-tool="uuid">
+      <div class="panel-head"><h1>UUID 生成</h1><p>RFC 4122 v4 随机 UUID</p></div>
+      <div class="card">
+        <div class="row">
+          <label style="margin:0">数量</label>
+          <input type="number" id="uuidCount" value="5" min="1" max="500">
+          <button class="btn sm" id="btnUuid">生成</button>
+          <button class="btn sm ghost" id="btnUuidCopy">复制全部</button>
+        </div>
+        <div class="out" id="uuidOut" style="min-height:90px">—</div>
+      </div>
+    </section>
+
+    <!-- ===== 正则 ===== -->
+    <section class="panel" data-tool="regex">
+      <div class="panel-head"><h1>正则测试</h1><p>匹配、捕获组展示与替换，支持超时停止和取消</p></div>
+      <div class="card">
+        <div class="row">
+          <div style="flex:1"><label>正则表达式</label><input id="rePattern" placeholder="(\d{4})-(\d{2})-(\d{2})"></div>
+          <div style="width:160px"><label>标志 (g/i/m/s)</label><input id="reFlags" value="g" placeholder="g"></div>
+        </div>
+        <div style="margin-top:10px"><label>测试文本</label><textarea id="reText" placeholder="2026-09-17 是发布日，2026-10-01 是国庆。"></textarea></div>
+        <div class="row" style="margin-top:10px">
+          <button class="btn sm" id="btnReTest">测试匹配</button>
+          <div style="flex:1"><input id="reReplace" placeholder="替换为，如 $1/$2/$3"></div>
+          <button class="btn sm ghost" id="btnReReplace">替换</button>
+          <button class="btn sm ghost" id="btnReCancel" disabled>取消</button>
+        </div>
+        <div class="hint">执行超过 1 秒自动停止；匹配结果最多展示 1000 条，单项长文本会截断。</div>
+        <div class="err" id="reErr"></div>
+        <div class="out" id="reResult" style="min-height:60px">—</div>
+        <div class="out" id="reReplaceOut" style="min-height:40px; display:none"></div>
+      </div>
+    </section>
+
+    <!-- ===== 颜色 ===== -->
+    <section class="panel" data-tool="color">
+      <div class="panel-head"><h1>颜色转换</h1><p>HEX / RGB / HSL 互转与实时预览</p></div>
+      <div class="card">
+        <div class="row" style="align-items:flex-end">
+          <div style="width:150px"><label>HEX</label><input id="colorHex" value="#0071e3" placeholder="#0071e3"></div>
+          <input type="color" id="colorPicker" value="#0071e3">
+          <button class="btn sm" id="btnColorApply">应用</button>
+        </div>
+        <div class="swatch" id="colorPreview"></div>
+        <div class="err" id="colorErr"></div>
+        <div class="kv" style="margin-top:12px"><span class="k">RGB</span><span class="v" id="colorRgb">—</span></div>
+        <div class="kv"><span class="k">HSL</span><span class="v" id="colorHsl">—</span></div>
+        <div class="kv"><span class="k">CSS</span><span class="v" id="colorCss">—</span></div>
+      </div>
+      <div class="card">
+        <h3>RGB → HEX</h3>
+        <div class="row" style="align-items:flex-end">
+          <div style="width:100px"><label>R</label><input id="rgbR" placeholder="0-255"></div>
+          <div style="width:100px"><label>G</label><input id="rgbG" placeholder="0-255"></div>
+          <div style="width:100px"><label>B</label><input id="rgbB" placeholder="0-255"></div>
+          <button class="btn sm" id="btnRgbToHex">转换</button>
+        </div>
+        <div class="out" id="rgbToHexOut">—</div>
+      </div>
+    </section>
+
+    <!-- ===== 进制 ===== -->
+    <section class="panel" data-tool="base">
+      <div class="panel-head"><h1>进制转换</h1><p>2 / 8 / 10 / 16 进制任意互转</p></div>
+      <div class="card">
+        <div class="row" style="align-items:flex-end">
+          <div style="flex:1"><label>数值</label><input id="baseInput" value="255" placeholder="输入数字"></div>
+          <div style="width:150px"><label>输入进制</label>
+            <select id="baseFrom"><option value="2">2 (二进制)</option><option value="8">8 (八进制)</option><option value="10" selected>10 (十进制)</option><option value="16">16 (十六进制)</option></select>
+          </div>
+        </div>
+        <div class="err" id="baseErr"></div>
+        <div class="kv" style="margin-top:14px"><span class="k">二进制</span><span class="v" id="baseBin">—</span></div>
+        <div class="kv"><span class="k">八进制</span><span class="v" id="baseOct">—</span></div>
+        <div class="kv"><span class="k">十进制</span><span class="v" id="baseDec">—</span></div>
+        <div class="kv"><span class="k">十六进制</span><span class="v" id="baseHex">—</span></div>
+      </div>
+    </section>
+
+    <!-- ===== 哈希 ===== -->
+    <section class="panel" data-tool="hash">
+      <div class="panel-head"><h1>哈希计算</h1><p>MD5 / SHA-1 / SHA-256（纯 JS 实现，离线）</p></div>
+      <div class="card">
+        <label>输入</label>
+        <textarea id="hashInput" placeholder="输入要计算哈希的文本"></textarea>
+        <div class="row" style="margin-top:10px">
+          <button class="btn sm" id="btnMd5">MD5</button>
+          <button class="btn sm ghost" id="btnSha1">SHA-1</button>
+          <button class="btn sm ghost" id="btnSha256">SHA-256</button>
+          <button class="btn sm ghost" id="btnHashCopy">复制</button>
+        </div>
+        <div class="out" id="hashOut" style="min-height:40px">—</div>
+      </div>
+    </section>
+
+    <!-- ===== 文本 ===== -->
+    <section class="panel" data-tool="text">
+      <div class="panel-head"><h1>文本处理</h1><p>大小写、去重、排序、换行与统计</p></div>
+      <div class="card">
+        <label>输入</label>
+        <textarea id="textInput" placeholder="在这里粘贴文本，每行一项…"></textarea>
+        <div class="row" style="margin-top:10px; flex-wrap:wrap">
+          <button class="btn sm ghost" id="btnUpper">转大写</button>
+          <button class="btn sm ghost" id="btnLower">转小写</button>
+          <button class="btn sm ghost" id="btnTrim">去除多余空格</button>
+          <button class="btn sm ghost" id="btnRmEmpty">移除空行</button>
+          <button class="btn sm ghost" id="btnDedup">行去重</button>
+          <button class="btn sm ghost" id="btnSort">行排序</button>
+          <button class="btn sm ghost" id="btnLf">LF 换行</button>
+          <button class="btn sm ghost" id="btnCrlf">CRLF 换行</button>
+          <button class="btn sm ghost" id="btnTextBack" title="把结果填回输入框，便于连续处理">结果回填</button>
+          <button class="btn sm ghost" id="btnTextCopy">复制</button>
+        </div>
+        <div class="out" id="textOut" style="min-height:90px">—</div>
+        <div class="stat" id="textStat" style="margin-top:12px"></div>
+      </div>
+    </section>
+  </main>
+</div>
+<div id="toast"></div>
+<script src="app.js"></script>
+</body>
+</html>
