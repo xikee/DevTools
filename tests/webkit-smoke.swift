@@ -36,11 +36,27 @@ class SmokeTest: NSObject, WKNavigationDelegate {
           }
         }
         check($('tsNowSec').textContent !== '-', '页面脚本初始化');
+        check(['btnJsonCopy', 'btnB64Copy', 'btnUuidCopy', 'btnHashCopy', 'btnTextCopy', 'btnTextBack']
+          .every(id => $(id).disabled), '首次生成前禁用复制与回填');
+        click('btnUuid');
+        check(!$('btnUuidCopy').disabled, '生成 UUID 后可复制');
+        input('textInput', 'old'); click('btnUpper');
+        check(!$('btnTextBack').disabled && !$('btnTextCopy').disabled, '文本结果可回填和复制');
+        input('textInput', 'new draft'); click('btnTextBack');
+        check($('textInput').value === 'new draft' && $('textOut').textContent !== 'OLD' &&
+          $('btnTextBack').disabled && $('btnTextCopy').disabled, '修改输入使旧结果失效');
+        click('btnUpper'); click('btnTextBack');
+        check($('textInput').value === 'NEW DRAFT', '重新处理后可正常回填');
+        input('textInput', '   '); click('btnRmEmpty'); click('btnTextBack');
+        check($('textInput').value === '' && $('btnTextCopy').disabled, '有效空结果可回填');
         document.querySelector('[data-tool="json"]').click();
         check(document.querySelector('.panel.active').dataset.tool === 'json', '导航切换');
         input('jsonInput', '{"id":9007199254740993,"n":1e400}'); click('btnJsonFormat');
         check($('jsonOut').textContent.includes('9007199254740993'), 'JSON 大整数保真');
         check($('jsonOut').textContent.includes('1e400'), 'JSON 指数保真');
+        check(!$('btnJsonCopy').disabled, '格式化后可复制');
+        input('jsonInput', '{'); click('btnJsonFormat');
+        check($('btnJsonCopy').disabled, '解析失败禁用复制');
         input('jsonInput', '{"s":"<img src=x onerror=alert(1)> & 中文"}'); click('btnJsonFormat');
         check($('jsonOut').querySelector('img') === null, 'JSON 高亮转义');
         check($('jsonOut').textContent.includes('<img'), 'JSON 高亮文本完整');
@@ -57,7 +73,12 @@ class SmokeTest: NSObject, WKNavigationDelegate {
         check(document.querySelector('#urlParams tbody td:nth-child(2)').textContent === 'what?yes', 'URL 问号保留');
         input('urlInput', 'https://example.com/#/page?x=1'); click('btnUrlParse');
         check($('urlParams').textContent.includes('无参数'), '排除片段参数');
-        input('b64Input', 'aGVsbG8='); click('btnB64Dec');
+        click('btnUrlEnc');
+        check($('urlParamsWrap').style.display === 'none' && !$('urlParams').querySelector('tbody tr'), '编解码清除旧参数');
+        input('b64Input', '77u/YWJj'); click('btnB64Dec');
+        check($('b64Out').textContent === String.fromCharCode(0xfeff) + 'abc' && !$('btnB64Copy').disabled, '保留起始 U+FEFF');
+        input('b64Input', '/w=='); click('btnB64Dec');
+        check($('b64Err').textContent.includes('UTF-8') && $('btnB64Copy').disabled, '识别非 UTF-8 字节');
         input('b64Input', '%%%'); click('btnB64Dec');
         check($('b64Out').textContent === '', 'Base64 失败清空');
         change('baseFrom', '16'); input('baseInput', '-0xFF');
@@ -99,6 +120,7 @@ class SmokeTest: NSObject, WKNavigationDelegate {
         check($('reResult').textContent === '#1 [0] "a"', '停止后恢复使用');
         input('hashInput', 'abc'); click('btnSha256');
         check($('hashOut').textContent === 'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad', 'WebKit 哈希');
+        check(!$('btnHashCopy').disabled, '计算哈希后可复制');
         return count;
         """#
         webView.callAsyncJavaScript(script, arguments: [:], in: nil, in: .page) { result in
