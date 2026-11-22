@@ -172,7 +172,7 @@
   const jsonInput = $('jsonInput'), jsonIndent = $('jsonIndent'), jsonOut = $('jsonOut'), jsonErr = $('jsonErr');
   function syntaxHighlight(json) {
     json = escapeHtml(json);
-    return json.replace(/"(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?/g, (match) => {
+    return json.replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g, (match) => {
       let cls = 'num';
       if (/^"/.test(match)) { cls = /:$/.test(match) ? 'key' : 'str'; }
       else if (/true|false/.test(match)) cls = 'bool';
