@@ -207,6 +207,39 @@ test('Base64 失败清空旧结果，UTF-8 与 URL-safe 仍可往返', (t) => {
   assert.match(app.out('b64Err'), /解码失败/);
 });
 
+test('Base64 保留起始 U+FEFF，区分编码格式错误与非 UTF-8 字节', (t) => {
+  const app = createApp(t);
+  const value = String.fromCharCode(0xfeff) + '中文';
+  for (const button of ['btnB64Enc', 'btnB64Url']) {
+    app.set('b64Input', value); app.click(button);
+    app.set('b64Input', app.out('b64Out')); app.click('btnB64Dec');
+    assert.equal(app.out('b64Out'), value);
+    assert.equal(app.elements.get('btnB64Copy').disabled, false);
+  }
+  for (const [input, expected] of [['/w==', /不是有效的 UTF-8/], ['%%%', /不是有效的 Base64/]]) {
+    app.set('b64Input', input); app.click('btnB64Dec');
+    assert.match(app.out('b64Err'), expected);
+    assert.equal(app.out('b64Out'), '');
+    assert.equal(app.elements.get('btnB64Copy').disabled, true);
+  }
+});
+
+test('编辑 URL 或执行编解码会清除旧参数表', (t) => {
+  const app = createApp(t);
+  for (const button of ['btnUrlEncC', 'btnUrlDecC', 'btnUrlEnc', 'btnUrlDec']) {
+    app.set('urlInput', '?old=1'); app.click('btnUrlParse');
+    app.click(button);
+    assert.equal(app.elements.get('urlParamsWrap').style.display, 'none');
+    assert.equal(app.tbody.children.length, 0);
+  }
+  app.click('btnUrlParse'); app.set('urlInput', 'new text'); app.input('urlInput');
+  assert.equal(app.elements.get('urlParamsWrap').style.display, 'none');
+  assert.equal(app.tbody.children.length, 0);
+  assert.equal(app.out('urlOut'), '—');
+  app.click('btnUrlEncC');
+  assert.equal(app.out('urlOut'), 'new%20text');
+});
+
 test('兼容复制接口返回失败或抛出异常时不会提示成功', async (t) => {
   for (const options of [{}, { copyThrows: true }]) {
     const app = createApp(t, options);
