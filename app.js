@@ -172,7 +172,7 @@
   const jsonInput = $('jsonInput'), jsonIndent = $('jsonIndent'), jsonOut = $('jsonOut'), jsonErr = $('jsonErr');
   function syntaxHighlight(json) {
     json = escapeHtml(json);
-    return json.replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g, (match) => {
+    return json.replace(/"(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?/g, (match) => {
       let cls = 'num';
       if (/^"/.test(match)) { cls = /:$/.test(match) ? 'key' : 'str'; }
       else if (/true|false/.test(match)) cls = 'bool';
@@ -207,6 +207,7 @@
   }
   function jsonDo(mode) {
     const txt = jsonInput.value;
+    $('btnJsonCopy').disabled = true;
     if (!txt.trim()) { jsonErr.textContent = ''; jsonOut.textContent = ''; return; }
     try {
       if (mode === 'escape') {
@@ -223,6 +224,7 @@
         jsonOut.innerHTML = mode === 'min' ? escapeHtml(out) : syntaxHighlight(out);
         jsonOut.className = 'json';
       }
+      $('btnJsonCopy').disabled = mode === 'unescape' && jsonOut.textContent === '';
       jsonErr.textContent = '';
     } catch (e) {
       jsonErr.textContent = '解析错误: ' + e.message;
@@ -237,7 +239,18 @@
 
   /* ---------- 4. URL ---------- */
   const urlInput = $('urlInput'), urlOut = $('urlOut'), urlParamsWrap = $('urlParamsWrap');
+  const urlParamsBody = document.querySelector('#urlParams tbody');
+  function clearUrlParams() {
+    urlParamsBody.innerHTML = '';
+    urlParamsWrap.style.display = 'none';
+  }
+  urlInput.addEventListener('input', () => {
+    clearUrlParams();
+    urlOut.textContent = '—';
+    urlOut.className = 'out';
+  });
   function urlDo(mode) {
+    clearUrlParams();
     const t = urlInput.value;
     try {
       if (mode === 'encC') urlOut.textContent = encodeURIComponent(t);
@@ -252,14 +265,12 @@
   }
   function urlParse() {
     const t = urlInput.value;
-    const tb = document.querySelector('#urlParams tbody');
-    tb.innerHTML = '';
+    clearUrlParams();
     let params;
     try {
       // 同时支持完整 URL、相对地址和 ?key=value；片段中的 ? 不属于 Query。
       params = new URL(t, 'https://devtools.invalid/').searchParams;
     } catch (e) {
-      urlParamsWrap.style.display = 'none';
       urlOut.className = 'err';
       urlOut.textContent = '无法解析 URL: ' + e.message;
       return;
@@ -268,10 +279,10 @@
     params.forEach((v, k) => {
       const tr = document.createElement('tr');
       tr.innerHTML = '<td class="mono">' + escapeHtml(k) + '</td><td class="mono">' + escapeHtml(v) + '</td>';
-      tb.appendChild(tr);
+      urlParamsBody.appendChild(tr);
       count++;
     });
-    if (count === 0) tb.innerHTML = '<tr><td colspan="2" style="color:var(--muted)">无参数</td></tr>';
+    if (count === 0) urlParamsBody.innerHTML = '<tr><td colspan="2" style="color:var(--muted)">无参数</td></tr>';
     urlOut.className = 'out';
     urlOut.textContent = '已解析 ' + count + ' 个参数';
     urlParamsWrap.style.display = 'block';
@@ -292,27 +303,35 @@
   }
   function b64decode(b64) {
     b64 = b64.replace(/-/g, '+').replace(/_/g, '/');
-    const bin = atob(b64);
+    let bin;
+    try {
+      bin = atob(b64);
+    } catch {
+      throw new Error('解码失败：不是有效的 Base64');
+    }
     const bytes = new Uint8Array(bin.length);
     for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-    return new TextDecoder().decode(bytes);
-  }
-  function b64Enc(urlSafe) {
     try {
-      let s = b64encode(b64Input.value);
-      if (urlSafe) s = s.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-      b64Out.textContent = s; b64Err.textContent = ''; b64Out.className = 'out';
-    } catch (e) { b64Out.textContent = ''; b64Err.textContent = e.message; }
+      return new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(bytes);
+    } catch {
+      throw new Error('解码失败：内容不是有效的 UTF-8 文本');
+    }
   }
-  function b64Dec() {
+  function runBase64(mode) {
+    let result = '';
     try {
-      b64Out.textContent = b64decode(b64Input.value.trim());
-      b64Err.textContent = ''; b64Out.className = 'out';
-    } catch (e) { b64Out.textContent = ''; b64Out.className = 'out'; b64Err.textContent = '解码失败：不是有效的 Base64'; }
+      result = mode === 'decode' ? b64decode(b64Input.value.trim()) : b64encode(b64Input.value);
+      if (mode === 'urlSafe') result = result.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+      b64Err.textContent = '';
+    } catch (e) {
+      b64Err.textContent = e.message;
+    }
+    b64Out.textContent = result;
+    $('btnB64Copy').disabled = result === '';
   }
-  $('btnB64Enc').addEventListener('click', () => b64Enc(false));
-  $('btnB64Url').addEventListener('click', () => b64Enc(true));
-  $('btnB64Dec').addEventListener('click', b64Dec);
+  $('btnB64Enc').addEventListener('click', () => runBase64('encode'));
+  $('btnB64Url').addEventListener('click', () => runBase64('urlSafe'));
+  $('btnB64Dec').addEventListener('click', () => runBase64('decode'));
   $('btnB64Copy').addEventListener('click', () => copyText(b64Out.textContent));
 
   /* ---------- 6. UUID ---------- */
@@ -330,6 +349,7 @@
     const arr = [];
     for (let i = 0; i < n; i++) arr.push(uuidv4());
     uuidOut.textContent = arr.join('\n');
+    $('btnUuidCopy').disabled = false;
   });
   $('btnUuidCopy').addEventListener('click', () => copyText(uuidOut.textContent));
 
@@ -677,6 +697,7 @@
     else if (algo === 'sha1') out = sha1Bytes(bytes);
     else if (algo === 'sha256') out = sha256Bytes(bytes);
     hashOut.textContent = out;
+    $('btnHashCopy').disabled = false;
   }
   $('btnMd5').addEventListener('click', () => hashDo('md5'));
   $('btnSha1').addEventListener('click', () => hashDo('sha1'));
@@ -685,7 +706,7 @@
 
   /* ---------- 11. 文本处理 ---------- */
   const textInput = $('textInput'), textOut = $('textOut'), textStat = $('textStat');
-  let textHasResult = false;
+  const textBack = $('btnTextBack'), textCopy = $('btnTextCopy');
   function updateTextStat(t) {
     const chars = t.length;
     // 行数：忽略末尾单个换行，使 "a\nb\n" 计为 2 行（符合编辑器直觉）
@@ -712,22 +733,26 @@
       default: out = raw;
     }
     textOut.textContent = out;
-    textHasResult = true;
+    textBack.disabled = false;
+    textCopy.disabled = out === '';
     updateTextStat(out);
   }
   ['btnUpper','btnLower','btnTrim','btnRmEmpty','btnDedup','btnSort','btnLf','btnCrlf'].forEach((id) => {
     const map = { btnUpper: 'upper', btnLower: 'lower', btnTrim: 'trim', btnRmEmpty: 'rmempty', btnDedup: 'dedup', btnSort: 'sort', btnLf: 'lf', btnCrlf: 'crlf' };
     $(id).addEventListener('click', () => textDo(map[id]));
   });
-  // 实时统计：边输入边更新
-  textInput.addEventListener('input', () => updateTextStat(textInput.value));
+  textInput.addEventListener('input', () => {
+    textBack.disabled = true;
+    textCopy.disabled = true;
+    textOut.textContent = '—';
+    updateTextStat(textInput.value);
+  });
   // 链式处理：把上一步结果回填到输入，便于连续多次变换
-  $('btnTextBack').addEventListener('click', () => {
-    if (!textHasResult) return;
+  textBack.addEventListener('click', () => {
     textInput.value = textOut.textContent;
     updateTextStat(textInput.value);
   });
-  $('btnTextCopy').addEventListener('click', () => copyText(textOut.textContent));
+  textCopy.addEventListener('click', () => copyText(textOut.textContent));
 
   /* ---------- 初始化 ---------- */
   applyColor();
